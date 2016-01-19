@@ -2,11 +2,59 @@
 
 This is the rolling changelog for TShock for Terraria. Use past tense when adding new entries; sign your name off when you add or change something. This should primarily be things like user changes, not necessarily codebase changes unless it's really relevant or large.
 
+## Upcoming Changes
+
+* Fixed character styles/gender not being saved properly on first login while SSC is on (@WhiteXZ)
+* Added a PlayerPermission hook fired whenever a permission check involving said player occurs (when the new TSPlayer.HasPermission method is called) (@Enerdy)
+
+## TShock 4.3.12
+
+* Fixed issues with TSPlayer.SetTeam not working (@WhiteXZ)
+* Fixed /butcher not killing bosses in expert difficulty (@WhiteXZ)
+* API: Deprecated PacketBufferer (now obviated by SendQ) (@WhiteXZ)
+* API: Building on Windows no longer breaks traps (@Wolfje)
+* Fixed bombs, dynamite, and sticky bombs (@Wolfje)
+* Removed spammy messages from OnSecondUpdate that confused some server owners (@Wolfje)
+* Rewrote some stat tracker code to send actually relevant data to the stats server (@Cleant / George from Multiplay UK)
+* Added an opt-out command line switch to disable the stat tracker (--stats-optout) (@Cleant / George from Multiplay UK)
+* Added a unique provider token which can be passed to the stat tracker (--provider-token [token]) for tracking servers from the same GSP. (@Cleant / George from Multiplay UK)
+
+## TShock 4.3.11
+
+* This release is actually 4.3.10, but was ticked extra due to a version issue on gen-dev prior to master push.
+
 ## TShock 4.3.10
 
+This version features a drop-in tile replacement system by @Wolfje that reduces RAM requirements
+by up to 70% on all worlds and CPU requirements up to 10% in the running process.
+
+* Large worlds: from 700MB-1GB -> ~325MB
+* Medium worlds: from 500MB -> ~200MB
+* Small worlds: from 400MB -> ~125MB
+
+Other notable changes include:
+
+* API: **Drop-in tile storage replacement system** (@Wolfje)
+* API: Fixed some possible packet leaks in sendq (@Wolfje)
+* API: APIVersion 1.22
 * API: Added crash protection around malicious and/or invalid packets (@Wolfje)
+* API: Fixed worlds not loading sometimes (@tysonstrange)
+* API: Fixed living leaf walls not working as housing
+* Fixed an issue preventing some players from joining when the world is saving (@Wolfje)
 * Fixed an issue adding a ban on a player who has previously been banned (@Wolfje)
 * Fixed /invade martian (@Wolfje)
+* Fixed target dummies not working properly (@WhiteXZ)
+* Added a config option (DisableSecondUpdateLogs) to prevent log spam from OnSecondUpdate() (@WhiteXZ)
+* Added RESTful API login rate limiting (@George)
+* Added config options (MaximumRequestsPerInterval, RequestBucketDecreaseIntervalMinutes, LimitOnlyFailedLoginRequests) for rate limiting (@George)
+* **DEPRECATION**: Deprecated Disable(string, bool) and added Disable(string, DisableFlags). Please update your plugins accordingly (@WhiteXZ)
+* Fixed Halloween and Christmas events not working properly (@TomyLobo)
+* Fixed the demon heart's extra accessory slot not working correctly in SSC (@WhiteXZ)
+* Fixed gender-changing potions not working correctly in SSC (@hastinbe)
+* Fixed IP bans not working correctly (@hastinbe)
+* Fixed /reload not using the correct permission (@WhiteXZ)
+* Fixed TSPlayer.ActiveChest not being tracked correctly resulting in item dupes while disabled (@WhiteXZ)
+* /reload now reloads tile and projectile bans
 
 ## TShock 4.3.8
 * API: Update to Terraria 1.3.0.8 (@Patrikkk)

@@ -45,7 +45,7 @@ namespace TShockAPI
 	/// This is the TShock main class. TShock is a plugin on the TerrariaServerAPI, so it extends the base TerrariaPlugin.
 	/// TShock also complies with the API versioning system, and defines its required API version here.
 	/// </summary>
-	[ApiVersion(1, 21)]
+	[ApiVersion(1, 22)]
 	public class TShock : TerrariaPlugin
 	{
 		/// <summary>VersionNum - The version number the TerrariaAPI will return back to the API. We just use the Assembly info.</summary>
@@ -100,6 +100,7 @@ namespace TShockAPI
 		/// <summary>OverridePort - Determines if TShock should override the server port.</summary>
 		public static bool OverridePort;
 		/// <summary>PacketBuffer - Static reference to the packet bufferer system, which buffers packets to clients for better performance.</summary>
+		[Obsolete("PacketBufferer is no longer used", true)]
 		public static PacketBufferer PacketBuffer;
 		/// <summary>Geo - Static reference to the GeoIP system which determines the location of an IP address.</summary>
 		public static GeoIPCountry Geo;
@@ -321,9 +322,6 @@ namespace TShockAPI
 
 				if (Config.RestApiEnabled)
 					RestApi.Start();
-
-				if (Config.BufferPackets)
-					PacketBuffer = new PacketBufferer(this);
 
 				Log.ConsoleInfo("AutoSave " + (Config.AutoSave ? "Enabled" : "Disabled"));
 				Log.ConsoleInfo("Backups " + (Backups.Interval > 0 ? "Enabled" : "Disabled"));
@@ -682,6 +680,16 @@ namespace TShockAPI
 
 							break;
 						}
+					case "--provider-token":
+						{
+							TShock.StatTracker.ProviderToken = parms[++i];
+							break;
+						}
+					case "--stats-optout":
+						{
+							TShock.StatTracker.OptOut = true;
+							break;
+						}
 				}
 			}
 		}
@@ -854,6 +862,8 @@ namespace TShockAPI
 		/// <summary>OnSecondUpdate - Called effectively every second for all time based checks.</summary>
 		private void OnSecondUpdate()
 		{
+			DisableFlags flags = Config.DisableSecondUpdateLogs ? DisableFlags.WriteToConsole : DisableFlags.WriteToLogAndConsole;
+
 			if (Config.ForceTime != "normal")
 			{
 				switch (Config.ForceTime)
@@ -875,7 +885,7 @@ namespace TShockAPI
 					{
 						if (player.TileKillThreshold >= Config.TileKillThreshold)
 						{
-							player.Disable("Reached TileKill threshold.");
+							player.Disable("Reached TileKill threshold.", flags);
 							TSPlayer.Server.RevertTiles(player.TilesDestroyed);
 							player.TilesDestroyed.Clear();
 						}
@@ -891,7 +901,7 @@ namespace TShockAPI
 					{
 						if (player.TilePlaceThreshold >= Config.TilePlaceThreshold)
 						{
-							player.Disable("Reached TilePlace threshold");
+							player.Disable("Reached TilePlace threshold", flags);
 							TSPlayer.Server.RevertTiles(player.TilesCreated);
 							player.TilesCreated.Clear();
 						}
@@ -932,7 +942,7 @@ namespace TShockAPI
 
 					if (player.TileLiquidThreshold >= Config.TileLiquidThreshold)
 					{
-						player.Disable("Reached TileLiquid threshold");
+						player.Disable("Reached TileLiquid threshold", flags);
 					}
 					if (player.TileLiquidThreshold > 0)
 					{
@@ -941,7 +951,7 @@ namespace TShockAPI
 
 					if (player.ProjectileThreshold >= Config.ProjectileThreshold)
 					{
-						player.Disable("Reached projectile threshold");
+						player.Disable("Reached projectile threshold", flags);
 					}
 					if (player.ProjectileThreshold > 0)
 					{
@@ -950,7 +960,7 @@ namespace TShockAPI
 
 					if (player.PaintThreshold >= Config.TilePaintThreshold)
 					{
-						player.Disable("Reached paint threshold");
+						player.Disable("Reached paint threshold", flags);
 					}
 					if (player.PaintThreshold > 0)
 					{
@@ -961,80 +971,98 @@ namespace TShockAPI
 					{
 						player.Spawn();
 					}
-					string check = "none";
-					foreach (Item item in player.TPlayer.inventory)
-					{
-						if (!player.Group.HasPermission(Permissions.ignorestackhackdetection) && (item.stack > item.maxStack || item.stack < 0) &&
-							item.type != 0)
-						{
-							check = "Remove item " + item.name + " (" + item.stack + ") exceeds max stack of " + item.maxStack;
-							player.SendErrorMessage(check);
-							break;
-						}
-					}
-					player.IgnoreActionsForCheating = check;
-					check = "none";
-					// Please don't remove this for the time being; without it, players wearing banned equipment will only get debuffed once
-					foreach (Item item in player.TPlayer.armor)
-					{
-						if (Itembans.ItemIsBanned(item.name, player))
-						{
-							player.SetBuff(BuffID.Frozen, 330, true);
-							player.SetBuff(BuffID.Stoned, 330, true);
-							player.SetBuff(BuffID.Webbed, 330, true);
-							check = "Remove armor/accessory " + item.name;
 
-							player.SendErrorMessage("You are wearing banned equipment. {0}", check);
-							break;
-						}
-					}
-					foreach (Item item in player.TPlayer.dye)
+					if (Main.ServerSideCharacter && !player.IsLoggedIn)
 					{
-						if (Itembans.ItemIsBanned(item.name, player))
+						if (CheckIgnores(player))
 						{
-							player.SetBuff(BuffID.Frozen, 330, true);
-							player.SetBuff(BuffID.Stoned, 330, true);
-							player.SetBuff(BuffID.Webbed, 330, true);
-							check = "Remove dye " + item.name;
-
-							player.SendErrorMessage("You are wearing banned equipment. {0}", check);
-							break;
+							player.Disable(flags: flags);
 						}
-					}
-					foreach (Item item in player.TPlayer.miscEquips)
-					{
-						if (Itembans.ItemIsBanned(item.name, player))
+						else if (Itembans.ItemIsBanned(player.TPlayer.inventory[player.TPlayer.selectedItem].name, player))
 						{
-							player.SetBuff(BuffID.Frozen, 330, true);
-							player.SetBuff(BuffID.Stoned, 330, true);
-							player.SetBuff(BuffID.Webbed, 330, true);
-							check = "Remove misc equip " + item.name;
-
-							player.SendErrorMessage("You are wearing banned equipment. {0}", check);
-							break;
+							player.Disable($"holding banned item: {player.TPlayer.inventory[player.TPlayer.selectedItem].name}", flags);
+							player.SendErrorMessage($"You are holding a banned item: {player.TPlayer.inventory[player.TPlayer.selectedItem].name}");
 						}
 					}
-					foreach (Item item in player.TPlayer.miscDyes)
+					else if (!Main.ServerSideCharacter || (Main.ServerSideCharacter && player.IsLoggedIn))
 					{
-						if (Itembans.ItemIsBanned(item.name, player))
+						string check = "none";
+						foreach (Item item in player.TPlayer.inventory)
 						{
-							player.SetBuff(BuffID.Frozen, 330, true);
-							player.SetBuff(BuffID.Stoned, 330, true);
-							player.SetBuff(BuffID.Webbed, 330, true);
-							check = "Remove misc dye " + item.name;
-
-							player.SendErrorMessage("You are wearing banned equipment. {0}", check);
-							break;
+							if (!player.HasPermission(Permissions.ignorestackhackdetection) && (item.stack > item.maxStack || item.stack < 0) &&
+								item.type != 0)
+							{
+								check = "Remove item " + item.name + " (" + item.stack + ") exceeds max stack of " + item.maxStack;
+								player.SendErrorMessage(check);
+								break;
+							}
 						}
-					}
-					player.IgnoreActionsForDisabledArmor = check;
-					if (CheckIgnores(player))
-					{
-						player.Disable("check ignores failed in OnSecondUpdate()", false);
-					}
-					else if (Itembans.ItemIsBanned(player.TPlayer.inventory[player.TPlayer.selectedItem].name, player))
-					{
-						player.SetBuff(23, 120); //Cursed
+						player.IgnoreActionsForCheating = check;
+						check = "none";
+						// Please don't remove this for the time being; without it, players wearing banned equipment will only get debuffed once
+						foreach (Item item in player.TPlayer.armor)
+						{
+							if (Itembans.ItemIsBanned(item.name, player))
+							{
+								player.SetBuff(BuffID.Frozen, 330, true);
+								player.SetBuff(BuffID.Stoned, 330, true);
+								player.SetBuff(BuffID.Webbed, 330, true);
+								check = "Remove armor/accessory " + item.name;
+
+								player.SendErrorMessage("You are wearing banned equipment. {0}", check);
+								break;
+							}
+						}
+						foreach (Item item in player.TPlayer.dye)
+						{
+							if (Itembans.ItemIsBanned(item.name, player))
+							{
+								player.SetBuff(BuffID.Frozen, 330, true);
+								player.SetBuff(BuffID.Stoned, 330, true);
+								player.SetBuff(BuffID.Webbed, 330, true);
+								check = "Remove dye " + item.name;
+
+								player.SendErrorMessage("You are wearing banned equipment. {0}", check);
+								break;
+							}
+						}
+						foreach (Item item in player.TPlayer.miscEquips)
+						{
+							if (Itembans.ItemIsBanned(item.name, player))
+							{
+								player.SetBuff(BuffID.Frozen, 330, true);
+								player.SetBuff(BuffID.Stoned, 330, true);
+								player.SetBuff(BuffID.Webbed, 330, true);
+								check = "Remove misc equip " + item.name;
+
+								player.SendErrorMessage("You are wearing banned equipment. {0}", check);
+								break;
+							}
+						}
+						foreach (Item item in player.TPlayer.miscDyes)
+						{
+							if (Itembans.ItemIsBanned(item.name, player))
+							{
+								player.SetBuff(BuffID.Frozen, 330, true);
+								player.SetBuff(BuffID.Stoned, 330, true);
+								player.SetBuff(BuffID.Webbed, 330, true);
+								check = "Remove misc dye " + item.name;
+
+								player.SendErrorMessage("You are wearing banned equipment. {0}", check);
+								break;
+							}
+						}
+						player.IgnoreActionsForDisabledArmor = check;
+
+						if (CheckIgnores(player))
+						{
+                            player.Disable(flags: flags);
+						}
+						else if (Itembans.ItemIsBanned(player.TPlayer.inventory[player.TPlayer.selectedItem].name, player))
+						{
+							player.Disable($"holding banned item: {player.TPlayer.inventory[player.TPlayer.selectedItem].name}", flags);
+							player.SendErrorMessage($"You are holding a banned item: {player.TPlayer.inventory[player.TPlayer.selectedItem].name}");
+						}
 					}
 
 					var oldRegion = player.CurrentRegion;
@@ -1044,12 +1072,12 @@ namespace TShockAPI
 					{
 						if (oldRegion != null)
 						{
-							Hooks.RegionHooks.OnRegionLeft(player, oldRegion);
+							RegionHooks.OnRegionLeft(player, oldRegion);
 						}
 
 						if (player.CurrentRegion != null)
 						{
-							Hooks.RegionHooks.OnRegionEntered(player, player.CurrentRegion);
+							RegionHooks.OnRegionEntered(player, player.CurrentRegion);
 						}
 					}
 				}
@@ -1306,7 +1334,7 @@ namespace TShockAPI
 			}
 			else
 			{
-				if (!tsplr.Group.HasPermission(Permissions.canchat))
+				if (!tsplr.HasPermission(Permissions.canchat))
 				{
 					args.Handled = true;
 				}
@@ -1624,7 +1652,7 @@ namespace TShockAPI
 		/// <returns>bool - True if the player should not be able to modify a tile.</returns>
 		public static bool CheckTilePermission(TSPlayer player, int tileX, int tileY, short tileType, GetDataHandlers.EditAction actionType)
 		{
-			if (!player.Group.HasPermission(Permissions.canbuild))
+			if (!player.HasPermission(Permissions.canbuild))
 			{
 				if (TShock.Config.AllowIce && actionType != GetDataHandlers.EditAction.PlaceTile)
 				{
@@ -1659,7 +1687,7 @@ namespace TShockAPI
 				return true;
 			}
 
-			if (!player.Group.HasPermission(Permissions.editregion) && !Regions.CanBuild(tileX, tileY, player) &&
+			if (!player.HasPermission(Permissions.editregion) && !Regions.CanBuild(tileX, tileY, player) &&
 				Regions.InArea(tileX, tileY))
 			{
 				if (((DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond) - player.RPm) > 2000)
@@ -1672,7 +1700,7 @@ namespace TShockAPI
 
 			if (Config.DisableBuild)
 			{
-				if (!player.Group.HasPermission(Permissions.antibuild))
+				if (!player.HasPermission(Permissions.antibuild))
 				{
 					if (((DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond) - player.WPm) > 2000)
 					{
@@ -1685,7 +1713,7 @@ namespace TShockAPI
 
 			if (Config.SpawnProtection)
 			{
-				if (!player.Group.HasPermission(Permissions.editspawn))
+				if (!player.HasPermission(Permissions.editspawn))
 				{
 					if (CheckSpawn(tileX, tileY))
 					{
@@ -1709,8 +1737,8 @@ namespace TShockAPI
 		/// <returns>bool - True if the player should not be able to modify the tile.</returns>
 		public static bool CheckTilePermission(TSPlayer player, int tileX, int tileY, bool paint = false)
 		{
-			if ((!paint && !player.Group.HasPermission(Permissions.canbuild)) ||
-				(paint && !player.Group.HasPermission(Permissions.canpaint)))
+			if ((!paint && !player.HasPermission(Permissions.canbuild)) ||
+				(paint && !player.HasPermission(Permissions.canpaint)))
 			{
 				if (((DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond) - player.BPm) > 2000)
 				{
@@ -1727,7 +1755,7 @@ namespace TShockAPI
 				return true;
 			}
 
-			if (!player.Group.HasPermission(Permissions.editregion) && !Regions.CanBuild(tileX, tileY, player) &&
+			if (!player.HasPermission(Permissions.editregion) && !Regions.CanBuild(tileX, tileY, player) &&
 				Regions.InArea(tileX, tileY))
 			{
 				if (((DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond) - player.RPm) > 2000)
@@ -1740,7 +1768,7 @@ namespace TShockAPI
 
 			if (Config.DisableBuild)
 			{
-				if (!player.Group.HasPermission(Permissions.antibuild))
+				if (!player.HasPermission(Permissions.antibuild))
 				{
 					if (((DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond) - player.WPm) > 2000)
 					{
@@ -1753,7 +1781,7 @@ namespace TShockAPI
 
 			if (Config.SpawnProtection)
 			{
-				if (!player.Group.HasPermission(Permissions.editspawn))
+				if (!player.HasPermission(Permissions.editspawn))
 				{
 					if (CheckSpawn(tileX, tileY))
 					{

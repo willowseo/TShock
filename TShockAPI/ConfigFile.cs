@@ -119,8 +119,8 @@ namespace TShockAPI
 		[Description("Mediumcore players ONLY. This means softcore players cannot join.")]
 		public bool MediumcoreOnly;
 
-		[Description("Kicks a mediumcore player on death.")]
 		/// <summary>KickOnMediumcoreDeath - Whether or not to kick mediumcore players on death.</summary>
+		[Description("Kicks a mediumcore player on death.")]
 		public bool KickOnMediumcoreDeath;
 
 		/// <summary>BanOnMediumcoreDeath - Whether or not to ban mediumcore players on death.</summary>
@@ -180,9 +180,13 @@ namespace TShockAPI
 		[Description("Force-disable printing logs to players with the log permission.")]
 		public bool DisableSpewLogs = true;
 
+		[Description("Prevents OnSecondUpdate checks from writing to the log file")]
+		public bool DisableSecondUpdateLogs = false;
+
 		[Description("Valid types are \"sha512\", \"sha256\", \"md5\", append with \"-xp\" for the xp supported algorithms.")]
 		public string HashAlgorithm = "sha512";
 
+		[Obsolete("PacketBuffered is no longer used")]
 		[Description("Buffers up the packets and sends them out at the end of each frame.")]
 		public bool BufferPackets = true;
 
@@ -432,6 +436,15 @@ namespace TShockAPI
 
 		[Description("The minimum password length for new user accounts. Minimum value is 4.")]
 		public int MinimumPasswordLength = 4;
+
+		[Description("The maximum REST requests in the bucket before denying requests. Minimum value is 5.")]
+		public int RESTMaximumRequestsPerInterval = 5;
+
+		[Description("How often in minutes the REST requests bucket is decreased by one. Minimum value is 1 minute.")]
+		public int RESTRequestBucketDecreaseIntervalMinutes = 1;
+
+		[Description("Whether we should limit only the max failed login requests, or all login requests")]
+		public bool RESTLimitOnlyFailedLoginRequests = true;
 
 		[Obsolete("This is being removed in future versions of TShock due to Terraria fixes.")]
 		[Description("Enable the DCU. Very dangerous; can destroy world without consequence.")] public bool
